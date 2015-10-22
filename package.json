@@ -1,0 +1,18 @@
+{
+  "name": "repomon",
+  "version": "0.0.1",
+  "description": "Monitors source code repositories based on configuration",
+  "main": "./bin/index.js",
+  "bin": {
+    "repomon": "./bin/index.js"
+  },
+  "dependencies": {
+    "minimist": "^1.2.0"
+  },
+  "keywords": [
+    "repomon"
+  ],
+  "author": "Bryan Way",
+  "license": "MIT",
+  "private": true
+}

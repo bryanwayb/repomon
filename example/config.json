@@ -1,0 +1,32 @@
+{
+	"git": {
+		"cmd": "git",
+		"authors": [ "youremail@domain.com" ],
+		"repos": "./where/to/place/git/repos",
+		"filetypes": {
+			"project name": [ "js", "css", "html" ]
+		},
+		"filter": {
+			"project name": "^filter based on regex$"
+		}
+	},
+	"bitbucket": {
+		"enabled": false,
+		"username": "user",
+		"password": "pass",
+		"method": "ssh",
+		"repoLists": [
+			"user",
+			"orTeam"
+		]
+	},
+	"github": {
+		"enabled": false,
+		"username": "user",
+		"password": "pass",
+		"method": "ssh",
+		"repoLists": [
+			"user"
+		]
+	}
+}
