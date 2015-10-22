@@ -39,8 +39,6 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	execSync(cmd + ' clean -fd');
 	execSync(cmd + ' pull --all');
 	execSync(cmd + ' reset --hard HEAD');
-	execSync(cmd + ' submodule sync --recursive');
-	execSync(cmd + ' submodule update --recursive');
 	
 	var authorFilter = '';
 	authors.forEach(function(author) {
