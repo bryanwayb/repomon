@@ -39,6 +39,8 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	execSync(cmd + ' clean -fd');
 	execSync(cmd + ' pull --all');
 	execSync(cmd + ' reset --hard HEAD');
+	execSync(cmd + ' submodule sync --recursive');
+	execSync(cmd + ' submodule update --recursive');
 	
 	var authorFilter = '';
 	authors.forEach(function(author) {
@@ -51,7 +53,7 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	numStatOutput.split('\n').forEach(function(line) {
 		var columns = line.split('\t');
 		
-		if(columns && columns.length >= 3 && columns[0].trim() !== '-' || columns[1].trim() !== '-' && columns[2].match(filetypeRegex) && columns[2].match(filefilter)) {
+		if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(filefilter)) {
 			ret.lines.added += parseInt(columns[0]);
 			ret.lines.deleted += parseInt(columns[1]);
 		}
@@ -59,7 +61,6 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	
 	var commitCount = parseInt(execSync(cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
 	if(!isNaN(commitCount)) {
-		console.log(commitCount);
 		ret.commitCount = commitCount;
 	}
 	
@@ -88,6 +89,7 @@ module.exports = function(config, callback) {
 		fs.readdirSync(repoDir).forEach(function(file) {
 			var filepath = path.join(repoDir, file);
 			try {
+				console.log(' -> ' + file);
 				ret.push(inspectRepo(config.git.cmd, filepath, config.git.authors, config.git.filetypes[file], config.git.filter[file], Date.now() - ((config.git.lookback || 604800) * 1000)));
 			}
 			catch(ex) {

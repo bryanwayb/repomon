@@ -16,8 +16,8 @@ catch(ex) {
 }
 
 var cloneCompleted = {
-	bitbucket: !config.bitbucket.enabled,
-	github: !config.github.enabled
+	bitbucket: 0,
+	github: 0
 };
 
 function fetchBitBucketRepo(authUsername, password, user, cloneMethod, callback, completeCalback, fetchUrl) {
@@ -57,14 +57,18 @@ function fetchBitBucketRepo(authUsername, password, user, cloneMethod, callback,
 				fetchBitBucketRepo(authUsername, password, user, cloneMethod, callback, completeCalback, data.next);
 			}
 			else {
-				cloneCompleted.bitbucket = true;
-				completeCalback();
+				cloneCompleted.bitbucket++;
+				if(config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
+					completeCalback();
+				}
 			}
 		});
 		
 		res.on('error', function() { 
-			cloneCompleted.bitbucket = true;
-			completeCalback();
+			cloneCompleted.bitbucket++;
+			if(config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
+				completeCalback();
+			}
 		});
 	});
 	req.end();
@@ -103,14 +107,18 @@ function fetchGitHubRepo(authUsername, password, user, cloneMethod, callback, co
 				fetchGitHubRepo(authUsername, password, user, cloneMethod, callback, completeCalback, ++page);
 			}
 			else {
-				cloneCompleted.github = true;
-				completeCalback();
+				cloneCompleted.github++;
+				if(config.github.repoLists.length === cloneCompleted.github) {
+					completeCalback();
+				}
 			}
 		});
 		
 		res.on('error', function() { 
-			cloneCompleted.github = true;
-			completeCalback();
+			cloneCompleted.github++;
+			if(config.github.repoLists.length === cloneCompleted.github) {
+				completeCalback();
+			}
 		});
 	});
 	req.end();
@@ -137,7 +145,8 @@ function cloneUrlCallback(name, clone) {
 }
 
 function cloneCompletionCallback() {
-	if(cloneCompleted.bitbucket && cloneCompleted.github) {
+	if(config.github.repoLists.length === cloneCompleted.github &&
+		config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
 		console.log('Running git inspection...');
 		require('./inspector.js')(config);
 	}
