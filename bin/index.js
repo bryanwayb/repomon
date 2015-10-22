@@ -135,8 +135,11 @@ function cloneUrlCallback(name, clone) {
 	catch(ex) { }
 	
 	if(!exists) {
+		console.log('Cloning remote: ' + clone);
 		try {
-			execSync(config.git.cmd + ' clone --recurse-submodules "' + clone + '" "' + destPath + '"');
+			execSync(config.git.cmd + ' clone --recurse-submodules "' + clone + '" "' + destPath + '"', {
+				stdio: [ undefined, undefined, undefined ]
+			});
 		}
 		catch(ex) {
 			console.error('Error cloning ' + clone + '\n' + ex.toString());
@@ -145,10 +148,24 @@ function cloneUrlCallback(name, clone) {
 }
 
 function cloneCompletionCallback() {
-	if(config.github.repoLists.length === cloneCompleted.github &&
-		config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
+	if((!config.github.enabled || config.github.repoLists.length === cloneCompleted.github) &&
+		(!config.bitbucket.enabled || config.bitbucket.repoLists.length === cloneCompleted.bitbucket)) {
 		console.log('Running git inspection...');
-		require('./inspector.js')(config);
+		var reporterName = (args.r != null ? args.r : (args.reporter != null ? args.reporter : 'jsonFeed'));
+		var reporter;
+		try {
+			reporter = require('./reporters/' + reporterName + '.js');
+		}
+		catch(ex) {
+			console.log('Error opening ' + reporterName + ' reporter');
+			process.exit(1);
+		}
+		var data = require('./inspector.js')(config);
+		
+		console.log('Generating ' + reporterName + ' report');
+		reporter(data, args);
+		
+		console.log('Completed!\n');
 	}
 }
 

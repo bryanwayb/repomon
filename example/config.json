@@ -8,6 +8,9 @@
 		},
 		"filter": {
 			"project name": "^filter based on regex$"
+		},
+		"branch": {
+			"project name": "HEAD"
 		}
 	},
 	"bitbucket": {

@@ -4,7 +4,7 @@ var execSync = require('child_process').execSync,
 
 var defaultFileTypes = [ 'js', 'cs', 'cshtml', 'cc', 'c', 'cpp', 'cxx', 'java', 'html', 'css' ];
 
-function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestamp) {
+function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestamp, branch) {
 	if(!filetypes) {
 		filetypes = defaultFileTypes;
 	}
@@ -34,11 +34,37 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	
 	var filetypeRegex = new RegExp('\.(' + filetypes.join('|') + ')$', 'i');
 	
-	cmd = cmd + ' "--git-dir=' + path.join(gitDir, '.git') + '" "--work-tree=' + gitDir + '"';
-	execSync(cmd + ' reset --hard');
-	execSync(cmd + ' clean -fd');
-	execSync(cmd + ' pull --all');
-	execSync(cmd + ' reset --hard HEAD');
+	process.chdir(gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
+	
+	execSync(cmd + ' fetch --all');
+	
+	if(!branch) { // No branch selected, use latest
+		var latestTimestamp = 0;
+	
+		var branchesOutput = execSync(cmd + ' branch --list -r --no-color');
+		branchesOutput.toString().trim().split('\n').forEach(function(branchName) {
+			branchName = branchName.trim();
+			if(branchName.indexOf(' -> ') === -1) {
+				branchName = branchName.substr(branchName.indexOf('/') + 1);
+				
+				execSync(cmd + ' checkout -f ' + branchName, {
+					stdio: [ undefined, undefined, undefined ]
+				});
+				var timestamp = parseInt(execSync(cmd + ' log -1 --pretty=tformat:"%at"'));
+				
+				if(timestamp > latestTimestamp) {
+					branch = branchName;
+					latestTimestamp = timestamp;
+				}
+			}
+		}, this);
+	}
+	
+	execSync(cmd + ' checkout -f ' + branch, {
+		stdio: [ undefined, undefined, undefined ]
+	});
+	execSync(cmd + ' submodule sync --recursive');
+	execSync(cmd + ' submodule update --recursive');
 	
 	var authorFilter = '';
 	authors.forEach(function(author) {
@@ -68,10 +94,9 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 		var timestamp = parseInt(line.substr(0, sepIndex));
 		
 		if(filterTimestamp == null || timestamp >= filterTimestamp) {
-			console.log(timestamp);
 			ret.commits.push({
 				author: line.substr(sepIndex + 1),
-				date: timestamp
+				timestamp: timestamp
 			});
 		}
 	});
@@ -80,15 +105,28 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 }
 
 module.exports = function(config, callback) {
-	var repoDir = path.resolve(process.cwd(), config.git.repos);
+	var currentDir = process.cwd();
+	var repoDir = path.resolve(currentDir, config.git.repos);
 	
 	var ret = [ ];
 	try {
 		fs.readdirSync(repoDir).forEach(function(file) {
 			var filepath = path.join(repoDir, file);
 			try {
-				console.log(' -> ' + file);
-				ret.push(inspectRepo(config.git.cmd, filepath, config.git.authors, config.git.filetypes[file], config.git.filter[file], Date.now() - ((config.git.lookback || 604800) * 1000)));
+				var allowScan = false;
+				try {
+					allowScan = fs.statSync(filepath).isDirectory()
+				}
+				catch(ex) { }
+				
+				if(allowScan) {
+					console.log(' -> ' + file);
+					var inspectData = inspectRepo(config.git.cmd, filepath, config.git.authors, config.git.filetypes[file], config.git.filter[file], Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)), config.git.branch[file]);
+					
+					inspectData.name = file;
+					
+					ret.push(inspectData);
+				}
 			}
 			catch(ex) {
 				console.error('Error while working on ' + filepath + '\n' + ex.toString());
@@ -98,6 +136,8 @@ module.exports = function(config, callback) {
 	catch(ex) {
 		console.error('Error while trying to read local repos\n' + ex.toString());
 	}
+	
+	process.chdir(currentDir);
 	
 	return ret;
 };
