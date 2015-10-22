@@ -36,7 +36,7 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	
 	process.chdir(gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
 	
-	execSync(cmd + ' fetch --all');
+	execSync(cmd + ' pull --all');
 	
 	if(!branch) { // No branch selected, use latest
 		var latestTimestamp = 0;

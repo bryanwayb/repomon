@@ -57,7 +57,5 @@ module.exports = function(data, args) {
 		}
 	}
 	
-	console.log(jsonFeed);
-	
 	fs.writeFileSync(path.resolve(process.cwd(), args.output || args.o), JSON.stringify(jsonFeed));
 };
