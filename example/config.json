@@ -2,6 +2,7 @@
 	"git": {
 		"cmd": "git",
 		"authors": [ "youremail@domain.com" ],
+		"lookback": 123456789,
 		"repos": "./where/to/place/git/repos",
 		"filetypes": {
 			"project name": [ "js", "css", "html" ]
