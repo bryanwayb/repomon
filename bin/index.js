@@ -10,7 +10,7 @@ var args = require('minimist')(process.argv.slice(2));
 
 var config;
 try {
-	config = require(path.resolve(process.cwd(), args.c != null ? args.c : (args.config != null ? args.config : path.join((process.env.USERPROFILE || process.env.HOME), '.repomon'))));
+	config = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.c != null ? args.c : (args.config != null ? args.config : path.join((process.env.USERPROFILE || process.env.HOME), '.repomon')))));
 }
 catch(ex) {
 	console.log('Error loading configuration file\n' + ex.toString());
