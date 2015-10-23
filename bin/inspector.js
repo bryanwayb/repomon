@@ -4,23 +4,23 @@ var execSync = require('child_process').execSync,
 
 var defaultFileTypes = [ 'js', 'cs', 'cshtml', 'cc', 'c', 'cpp', 'cxx', 'java', 'html', 'css' ];
 
-function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestamp, branch) {
-	if(!filetypes) {
-		filetypes = defaultFileTypes;
+function inspectRepo(options) {
+	if(!options.filetypes) {
+		options.filetypes = defaultFileTypes;
 	}
 	
-	if(!filefilter) {
-		filefilter = '.*';
+	if(!options.filefilter) {
+		options.filefilter = '.*';
 	}
 	
-	filefilter = new RegExp(filefilter, 'i');
+	options.filefilter = new RegExp(options.filefilter, 'i');
 	
-	if(!authors) {
-		authors = [ ];
+	if(!options.authors) {
+		options.authors = [ ];
 	}
 	
-	if(authors.length === 0) {
-		authors.push('');
+	if(options.authors.length === 0) {
+		options.authors.push('');
 	}
 	
 	var ret = {
@@ -32,68 +32,68 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 		commits: [ ]
 	};
 	
-	var filetypeRegex = new RegExp('\.(' + filetypes.join('|') + ')$', 'i');
+	var filetypeRegex = new RegExp('\.(' + options.filetypes.join('|') + ')$', 'i');
 	
-	process.chdir(gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
+	process.chdir(options.gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
 	
-	execSync(cmd + ' pull --all');
+	if(options.pull) {
+		execSync(options.cmd + ' pull --all');
+	}
 	
-	if(!branch) { // No branch selected, use latest
+	if(!options.branch) { // No branch selected, use latest
 		var latestTimestamp = 0;
 	
-		var branchesOutput = execSync(cmd + ' branch --list -r --no-color');
+		var branchesOutput = execSync(options.cmd + ' branch --list -r --no-color');
 		branchesOutput.toString().trim().split('\n').forEach(function(branchName) {
 			branchName = branchName.trim();
 			if(branchName.indexOf(' -> ') === -1) {
 				branchName = branchName.substr(branchName.indexOf('/') + 1);
 				
-				execSync(cmd + ' checkout -f ' + branchName, {
+				execSync(options.cmd + ' checkout -f ' + branchName, {
 					stdio: [ undefined, undefined, undefined ]
 				});
-				var timestamp = parseInt(execSync(cmd + ' log -1 --pretty=tformat:"%at"'));
+				var timestamp = parseInt(execSync(options.cmd + ' log -1 --pretty=tformat:"%at"'));
 				
 				if(timestamp > latestTimestamp) {
-					branch = branchName;
+					options.branch = branchName;
 					latestTimestamp = timestamp;
 				}
 			}
 		}, this);
 	}
 	
-	execSync(cmd + ' checkout -f ' + branch, {
+	execSync(options.cmd + ' checkout -f ' + options.branch, {
 		stdio: [ undefined, undefined, undefined ]
 	});
-	execSync(cmd + ' submodule sync --recursive');
-	execSync(cmd + ' submodule update --recursive');
 	
 	var authorFilter = '';
-	authors.forEach(function(author) {
+	options.authors.forEach(function(author) {
 		if(author && author.length > 0) {
 			authorFilter += '--author="' + author + '" ';
 		}
 	}, this);
 	
-	var numStatOutput = execSync(cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
+	var numStatOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
 	numStatOutput.split('\n').forEach(function(line) {
 		var columns = line.split('\t');
 		
-		if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(filefilter)) {
+		if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(options.filefilter)) {
 			ret.lines.added += parseInt(columns[0]);
 			ret.lines.deleted += parseInt(columns[1]);
 		}
 	});
 	
-	var commitCount = parseInt(execSync(cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
+	var commitCount = parseInt(execSync(options.cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
 	if(!isNaN(commitCount)) {
 		ret.commitCount = commitCount;
 	}
 	
-	var commitsOutput = execSync(cmd + ' log ' + authorFilter + '--pretty=tformat:"%at:%an <%ae>"').toString().trim();
+	var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat:"%at:%an <%ae>"').toString().trim();
 	commitsOutput.split('\n').forEach(function(line) {
 		var sepIndex = line.indexOf(':');
 		var timestamp = parseInt(line.substr(0, sepIndex));
 		
-		if(filterTimestamp == null || timestamp >= filterTimestamp) {
+		if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
 			ret.commits.push({
 				author: line.substr(sepIndex + 1),
 				timestamp: timestamp
@@ -104,7 +104,7 @@ function inspectRepo(cmd, gitDir, authors, filetypes, filefilter, filterTimestam
 	return ret;
 }
 
-module.exports = function(config, callback) {
+module.exports = function(config, args) {
 	var currentDir = process.cwd();
 	var repoDir = path.resolve(currentDir, config.git.repos);
 	
@@ -120,8 +120,18 @@ module.exports = function(config, callback) {
 				catch(ex) { }
 				
 				if(allowScan) {
-					console.log(' -> ' + file);
-					var inspectData = inspectRepo(config.git.cmd, filepath, config.git.authors, config.git.filetypes[file], config.git.filter[file], Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)), config.git.branch[file]);
+					var forcePull = args['force-pull'] === file || Array.isArray(args['force-pull']) && args['force-pull'].indexOf(file) !== -1;
+					console.log(' -> ' + file + (args['disable-pull'] && forcePull ? ' (forced pull)' : ''));
+					var inspectData = inspectRepo({
+						cmd: config.git.cmd,
+						gitDir: filepath,
+						authors: config.git.authors,
+						filetypes: config.git.filetypes[file],
+						filefilter: config.git.filter[file],
+						filterTimestamp: Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)),
+						branch: config.git.branch[file],
+						pull: !args['disable-pull'] || forcePull
+					});
 					
 					inspectData.name = file;
 					

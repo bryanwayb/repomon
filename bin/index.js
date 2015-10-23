@@ -137,7 +137,7 @@ function cloneUrlCallback(name, clone) {
 	if(!exists) {
 		console.log('Cloning remote: ' + clone);
 		try {
-			execSync(config.git.cmd + ' clone --recurse-submodules "' + clone + '" "' + destPath + '"', {
+			execSync(config.git.cmd + ' clone "' + clone + '" "' + destPath + '"', {
 				stdio: [ undefined, undefined, undefined ]
 			});
 		}
@@ -160,7 +160,7 @@ function cloneCompletionCallback() {
 			console.log('Error opening ' + reporterName + ' reporter');
 			process.exit(1);
 		}
-		var data = require('./inspector.js')(config);
+		var data = require('./inspector.js')(config, args);
 		
 		console.log('Generating ' + reporterName + ' report');
 		reporter(data, args);
