@@ -65,13 +65,12 @@ function fetchBitBucketRepo(authUsername, password, user, cloneMethod, callback,
 				}
 			}
 		});
-		
-		res.on('error', function() { 
-			cloneCompleted.bitbucket++;
-			if(config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
-				completeCalback();
-			}
-		});
+	});
+	req.on('error', function() {
+		cloneCompleted.bitbucket++;
+		if(config.bitbucket.repoLists.length === cloneCompleted.bitbucket) {
+			completeCalback();
+		}
 	});
 	req.end();
 }
@@ -115,13 +114,12 @@ function fetchGitHubRepo(authUsername, password, user, cloneMethod, callback, co
 				}
 			}
 		});
-		
-		res.on('error', function() { 
-			cloneCompleted.github++;
-			if(config.github.repoLists.length === cloneCompleted.github) {
-				completeCalback();
-			}
-		});
+	});
+	req.on('error', function() { 
+		cloneCompleted.github++;
+		if(config.github.repoLists.length === cloneCompleted.github) {
+			completeCalback();
+		}
 	});
 	req.end();
 }
