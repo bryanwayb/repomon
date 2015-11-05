@@ -1,6 +1,7 @@
 var execSync = require('child_process').execSync,
 	fs = require('fs'),
-	path = require('path');
+	path = require('path'),
+	functions = require('./functions.js');
 
 var defaultFileTypes = [ 'js', 'cs', 'cshtml', 'cc', 'c', 'cpp', 'cxx', 'java', 'html', 'css' ];
 
@@ -37,7 +38,14 @@ function inspectRepo(options) {
 	process.chdir(options.gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
 	
 	if(options.pull) {
-		execSync(options.cmd + ' pull --all');
+		try {
+			execSync(options.cmd + ' pull --all', {
+				stdio: [ undefined, undefined, undefined ]
+			});
+		}
+		catch(ex) {
+			return;
+		}
 	}
 	
 	if(!options.branch) { // No branch selected, use latest
@@ -104,7 +112,7 @@ function inspectRepo(options) {
 	return ret;
 }
 
-module.exports = function(config, args) {
+module.exports = function(config, args, pulledrepos) {
 	var currentDir = process.cwd();
 	var repoDir = path.resolve(currentDir, config.git.repos);
 	
@@ -130,12 +138,17 @@ module.exports = function(config, args) {
 						filefilter: config.git.filter[file],
 						filterTimestamp: Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)),
 						branch: config.git.branch[file],
-						pull: !args['disable-pull'] || forcePull
+						pull: (!args['disable-pull'] || forcePull) && pulledrepos.indexOf(filepath) === -1
 					});
 					
-					inspectData.name = file;
-					
-					ret.push(inspectData);
+					if(inspectData) {
+						inspectData.name = file;
+						ret.push(inspectData);
+					}
+					else { // If nothing is returned, delete the directory to prevent things like this again
+						process.chdir(currentDir); // Back to the original directory
+						functions.rmdir(filepath);
+					}
 				}
 			}
 			catch(ex) {

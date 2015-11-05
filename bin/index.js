@@ -4,13 +4,27 @@ var path = require('path'),
 	url = require('url'),
 	https = require('https'),
 	fs = require('fs'),
-	execSync = require('child_process').execSync;
+	execSync = require('child_process').execSync,
+	functions = require('./functions.js');
 
 var args = require('minimist')(process.argv.slice(2));
+var pulledrepos = [ ];
 
 var config;
 try {
 	config = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.c != null ? args.c : (args.config != null ? args.config : path.join((process.env.USERPROFILE || process.env.HOME), '.repomon')))));
+	
+	if(args['disable-all-apis']) {
+		args['disable-bitbucket-api'] = args['disable-github-api'] = true;
+	}
+	
+	if(args['disable-bitbucket-api']) {
+		config.bitbucket.enabled = false;
+	}
+	
+	if(args['disable-github-api']) {
+		config.github.enabled = false;
+	}
 }
 catch(ex) {
 	console.log('Error loading configuration file\n' + ex.toString());
@@ -134,12 +148,38 @@ function cloneUrlCallback(name, clone) {
 	}
 	catch(ex) { }
 	
-	if(!exists) {
+	if(exists) {
+		if(!args['disable-pull'] || (args['force-pull'] === name || Array.isArray(args['force-pull']) && args['force-pull'].indexOf(name) !== -1)) {
+			console.log('Updating remote: ' + clone);
+
+			var currentDir = process.cwd();
+			try {
+				process.chdir(destPath);
+				
+				execSync(config.git.cmd + ' pull --all', {
+					stdio: [ undefined, undefined, undefined ]
+				});
+				
+				pulledrepos.push(destPath);
+			}
+			catch(ex) {
+				console.warn(' -> Remote failed, recloning');
+				functions.rmdir(destPath);
+				exists = false;
+			}
+			process.chdir(currentDir);
+		}
+	}
+	else {
 		console.log('Cloning remote: ' + clone);
+	}
+	
+	if(!exists) {
 		try {
 			execSync(config.git.cmd + ' clone "' + clone + '" "' + destPath + '"', {
 				stdio: [ undefined, undefined, undefined ]
 			});
+			pulledrepos.push(destPath);
 		}
 		catch(ex) {
 			console.error('Error cloning ' + clone + '\n' + ex.toString());
@@ -160,16 +200,17 @@ function cloneCompletionCallback() {
 			console.log('Error opening ' + reporterName + ' reporter');
 			process.exit(1);
 		}
-		var data = require('./inspector.js')(config, args);
+		var data = require('./inspector.js')(config, args, pulledrepos);
 		
 		console.log('Generating ' + reporterName + ' report');
-		reporter(data, args);
+		
+		fs.writeFileSync(path.resolve(process.cwd(), args.output || args.o), reporter(data, args));
 		
 		console.log('Completed!\n');
 	}
 }
 
-console.log('Cloning started...');
+console.log('Cloning and updates started...');
 
 if(config.bitbucket.enabled) {
 	config.bitbucket.repoLists.forEach(function(entry) {
