@@ -84,16 +84,10 @@ function inspectRepo(options) {
 				branchName = branchName.substr(branchName.indexOf('/') + 1);
 				
 				if(localBranches.indexOf(branchName) === -1) { // Checkout branch if it doesn't exist locally
-					if(options.pull)
-					{
-						execSync(options.cmd + ' checkout -f ' + branchName, {
-							stdio: [ undefined, undefined, undefined ]
-						});
-						currentBranch = branchName;
-					}
-					else {
-						return; // Don't checkout branch since it doesn't exist locally
-					}
+					execSync(options.cmd + ' checkout -f ' + branchName, {
+						stdio: [ undefined, undefined, undefined ]
+					});
+					currentBranch = branchName;
 				}
 
 				var timestamp = parseInt(execSync(options.cmd + ' log ' + branchName + ' -1 --pretty=tformat:"%at"'));
