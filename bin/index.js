@@ -204,7 +204,14 @@ function cloneCompletionCallback() {
 		
 		console.log('Generating ' + reporterName + ' report');
 		
-		fs.writeFileSync(path.resolve(process.cwd(), args.output || args.o), reporter(data, args));
+		var output = reporter(data, args),
+			filename = args.output || args.o;
+		if(filename) {
+			fs.writeFileSync(path.resolve(process.cwd(), filename), output);
+		}
+		else {
+			console.log(output);
+		}
 		
 		console.log('Completed!\n');
 	}

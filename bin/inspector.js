@@ -5,6 +5,16 @@ var execSync = require('child_process').execSync,
 
 var defaultFileTypes = [ 'js', 'cs', 'cshtml', 'cc', 'c', 'cpp', 'cxx', 'java', 'html', 'css' ];
 
+function parseNumStatLine(line, filetypeRegex, filefilter) {
+	var columns = line.split('\t');
+		
+	if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(filefilter)) {
+		columns[0] = parseInt(columns[0]);
+		columns[1] = parseInt(columns[1]);
+		return columns;
+	}
+}
+
 function inspectRepo(options) {
 	if(!options.filetypes) {
 		options.filetypes = defaultFileTypes;
@@ -48,31 +58,63 @@ function inspectRepo(options) {
 		}
 	}
 	
-	if(!options.branch) { // No branch selected, use latest
+	var currentBranch, checkoutBranch = options.branch;
+	if(!checkoutBranch) { // No branch selected, use latest
 		var latestTimestamp = 0;
+
+		var localBranches = [ ];
+		execSync(options.cmd + ' branch --list --no-color').toString().trim().split('\n').forEach(function(branchName) {
+			branchName = branchName.trim();
+			if(branchName[0] === '*') {
+				branchName = branchName.slice(1).trim();
+				currentBranch = branchName;
+			}
+			localBranches.push(branchName);
+		});
 	
 		var branchesOutput = execSync(options.cmd + ' branch --list -r --no-color');
 		branchesOutput.toString().trim().split('\n').forEach(function(branchName) {
 			branchName = branchName.trim();
+			
+			if(branchName.length === 0) {
+				return;
+			}
+			
 			if(branchName.indexOf(' -> ') === -1) {
 				branchName = branchName.substr(branchName.indexOf('/') + 1);
 				
-				execSync(options.cmd + ' checkout -f ' + branchName, {
-					stdio: [ undefined, undefined, undefined ]
-				});
-				var timestamp = parseInt(execSync(options.cmd + ' log -1 --pretty=tformat:"%at"'));
+				if(localBranches.indexOf(branchName) === -1) { // Checkout branch if it doesn't exist locally
+					if(options.pull)
+					{
+						execSync(options.cmd + ' checkout -f ' + branchName, {
+							stdio: [ undefined, undefined, undefined ]
+						});
+						currentBranch = branchName;
+					}
+					else {
+						return; // Don't checkout branch since it doesn't exist locally
+					}
+				}
+
+				var timestamp = parseInt(execSync(options.cmd + ' log ' + branchName + ' -1 --pretty=tformat:"%at"'));
 				
 				if(timestamp > latestTimestamp) {
-					options.branch = branchName;
+					checkoutBranch = branchName;
 					latestTimestamp = timestamp;
 				}
 			}
 		}, this);
 	}
 	
-	execSync(options.cmd + ' checkout -f ' + options.branch, {
-		stdio: [ undefined, undefined, undefined ]
-	});
+	if(!checkoutBranch) { // No valid branches
+		return;
+	}
+	
+	if(currentBranch !== checkoutBranch) {
+		execSync(options.cmd + ' checkout -f ' + checkoutBranch, {
+			stdio: [ undefined, undefined, undefined ]
+		});
+	}
 	
 	var authorFilter = '';
 	options.authors.forEach(function(author) {
@@ -83,11 +125,10 @@ function inspectRepo(options) {
 	
 	var numStatOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
 	numStatOutput.split('\n').forEach(function(line) {
-		var columns = line.split('\t');
-		
-		if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(options.filefilter)) {
-			ret.lines.added += parseInt(columns[0]);
-			ret.lines.deleted += parseInt(columns[1]);
+		var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
+		if(columns) {
+			ret.lines.added += columns[0];
+			ret.lines.deleted += columns[1];
 		}
 	});
 	
@@ -96,18 +137,44 @@ function inspectRepo(options) {
 		ret.commitCount = commitCount;
 	}
 	
-	var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat:"%at:%an <%ae>"').toString().trim();
-	commitsOutput.split('\n').forEach(function(line) {
-		var sepIndex = line.indexOf(':');
-		var timestamp = parseInt(line.substr(0, sepIndex));
+	var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%an <%ae>" --numstat').toString().trim().split('\n');
+	var len = commitsOutput.length,
+		currentCommit;
+	for(var i = 0; i < len; i++) {		
+		var line = commitsOutput[i];
 		
-		if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
-			ret.commits.push({
-				author: line.substr(sepIndex + 1),
-				timestamp: timestamp
-			});
+		line = line.trim();
+		if(line.length === 0) {
+			currentCommit = null;
+			continue;
 		}
-	});
+		
+		if(!currentCommit) {
+			var sepIndex = line.indexOf(':');
+			if(sepIndex !== -1) {
+				var timestamp = parseInt(line.substr(0, sepIndex));
+				
+				if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
+					currentCommit = {
+						author: line.substr(sepIndex + 1),
+						timestamp: timestamp,
+						lines: {
+							added: 0,
+							deleted: 0
+						}
+					};
+					ret.commits.push(currentCommit);
+				}
+			}
+		}
+		else {
+			var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
+			if(columns) {
+				currentCommit.lines.added += columns[0];
+				currentCommit.lines.deleted += columns[1];
+			}
+		}
+	}
 	
 	return ret;
 }

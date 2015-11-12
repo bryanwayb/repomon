@@ -38,22 +38,28 @@ module.exports = function(data, args) {
 			return a.timestamp - b.timestamp;
 		});
 	}
-	
-	
+
 	var previousEntry;
 	for(i = feedObjects.length - 1; i >= 0 ; i--) {
-		if(!previousEntry || previousEntry.name !== feedObjects[i].name
-			|| previousEntry.author !== feedObjects[i].author) {
+		var current = feedObjects[i];
+		if(!previousEntry || previousEntry.name !== current.name
+			|| previousEntry.author !== current.author) {
 			previousEntry = {
-				name: feedObjects[i].name,
-				author: feedObjects[i].author,
-				timestamp: feedObjects[i].timestamp, // Because of how this bit is structured, this will be the latest commited date
-				count: 1
+				name: current.name,
+				author: current.author,
+				timestamp: current.timestamp, // Because of how this bit is structured, this will be the latest commited date
+				count: 1,
+				lines: {
+					added: current.lines.added,
+					deleted: current.lines.deleted
+				}
 			};
 			jsonFeed.feed.push(previousEntry);
 		}
 		else {
 			previousEntry.count++;
+			previousEntry.lines.added += current.lines.added;
+			previousEntry.lines.deleted += current.lines.deleted;
 		}
 	}
 	
