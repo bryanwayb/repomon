@@ -94,7 +94,15 @@ function fetchGitHubRepo(authUsername, password, user, cloneMethod, callback, co
 		page = 1;
 	}
 	
-	var fetchUrl = url.parse('https://api.github.com/users/' + user + '/repos?page=' + page);
+	var resolveUrl;
+	if(user === authUsername) { // Authenticated user should have special read rights
+		resolveUrl = 'https://api.github.com/user/repos?page=' + page;
+	}
+	else {
+		resolveUrl = 'https://api.github.com/users/' + user + '/repos?page=' + page;
+	}
+	
+	var fetchUrl = url.parse(resolveUrl);
 	fetchUrl.auth = authUsername + ':' + password;
 	fetchUrl.method = 'GET';
 	fetchUrl.headers = {
