@@ -1,6 +1,6 @@
 {
   "name": "repomon",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Monitors source code repositories based on configuration",
   "main": "./bin/index.js",
   "bin": {
