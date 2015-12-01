@@ -119,37 +119,23 @@ function inspectRepo(options) {
 			});
 		}
 		
-		var numStatOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
-		numStatOutput.split('\n').forEach(function(line) {
-			var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
-			if(columns) {
-				ret.lines.added += columns[0];
-				ret.lines.deleted += columns[1];
-			}
-		});
-		
-		var commitCount = parseInt(execSync(options.cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
-		if(!isNaN(commitCount)) {
-			ret.commitCount = commitCount;
-		}
-		
 		var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%an <%ae>" --numstat').toString().trim().split('\n');
 		var len = commitsOutput.length;
 		for(var i = 0; i < len; i++) {		
-			var line = commitsOutput[i];
-			
-			line = line.trim();
-			if(line.length === 0) {
-				currentCommit = null;
-				continue;
-			}
-			
-			if(!currentCommit) {
-				var sepIndex = line.indexOf(':');
-				if(sepIndex !== -1) {
-					var timestamp = parseInt(line.substr(0, sepIndex));
-					
-					if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
+			var line = commitsOutput[i].trim();
+			if(line) {
+				if(currentCommit) {
+					var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
+					if(columns) {
+						currentCommit.lines.added += columns[0];
+						currentCommit.lines.deleted += columns[1];
+					}
+				}
+				else {
+					var sepIndex = line.indexOf(':');
+					if(sepIndex !== -1) {
+						var timestamp = parseInt(line.substr(0, sepIndex));
+						ret.commitCount++;
 						currentCommit = {
 							author: line.substr(sepIndex + 1),
 							timestamp: timestamp,
@@ -158,16 +144,17 @@ function inspectRepo(options) {
 								deleted: 0
 							}
 						};
-						ret.commits.push(currentCommit);
+						if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
+							ret.commits.push(currentCommit);
+						}
 					}
 				}
 			}
-			else {
-				var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
-				if(columns) {
-					currentCommit.lines.added += columns[0];
-					currentCommit.lines.deleted += columns[1];
-				}
+			
+			if((!line || i + 1 >= len) && currentCommit) {
+				ret.lines.added += currentCommit.lines.added;
+				ret.lines.deleted += currentCommit.lines.deleted;
+				currentCommit = null;
 			}
 		}
 	}
