@@ -195,7 +195,7 @@ module.exports = function(config, args, pulledrepos) {
 						cmd: config.git.cmd,
 						gitDir: filepath,
 						authors: config.git.authors,
-						filetypes: config.git.filetypes[file],
+						filetypes: config.git.defaultFiletypes || config.git.filetypes[file],
 						filefilter: config.git.filter[file],
 						filterTimestamp: Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)),
 						branch: config.git.branch[file],
