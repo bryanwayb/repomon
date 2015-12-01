@@ -58,58 +58,6 @@ function inspectRepo(options) {
 		}
 	}
 	
-	var currentBranch, checkoutBranch = options.branch;
-	if(!checkoutBranch) { // No branch selected, use latest
-		var latestTimestamp = 0;
-
-		var localBranches = [ ];
-		execSync(options.cmd + ' branch --list --no-color').toString().trim().split('\n').forEach(function(branchName) {
-			branchName = branchName.trim();
-			if(branchName[0] === '*') {
-				branchName = branchName.slice(1).trim();
-				currentBranch = branchName;
-			}
-			localBranches.push(branchName);
-		});
-	
-		var branchesOutput = execSync(options.cmd + ' branch --list -r --no-color');
-		branchesOutput.toString().trim().split('\n').forEach(function(branchName) {
-			branchName = branchName.trim();
-			
-			if(branchName.length === 0) {
-				return;
-			}
-			
-			if(branchName.indexOf(' -> ') === -1) {
-				branchName = branchName.substr(branchName.indexOf('/') + 1);
-				
-				if(localBranches.indexOf(branchName) === -1) { // Checkout branch if it doesn't exist locally
-					execSync(options.cmd + ' checkout -f ' + branchName, {
-						stdio: [ undefined, undefined, undefined ]
-					});
-					currentBranch = branchName;
-				}
-
-				var timestamp = parseInt(execSync(options.cmd + ' log ' + branchName + ' -1 --pretty=tformat:"%at"'));
-				
-				if(timestamp > latestTimestamp) {
-					checkoutBranch = branchName;
-					latestTimestamp = timestamp;
-				}
-			}
-		}, this);
-	}
-	
-	if(!checkoutBranch) { // No valid branches
-		return;
-	}
-	
-	if(currentBranch !== checkoutBranch) {
-		execSync(options.cmd + ' checkout -f ' + checkoutBranch, {
-			stdio: [ undefined, undefined, undefined ]
-		});
-	}
-	
 	var authorFilter = '';
 	options.authors.forEach(function(author) {
 		if(author && author.length > 0) {
@@ -117,55 +65,183 @@ function inspectRepo(options) {
 		}
 	}, this);
 	
-	var numStatOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
-	numStatOutput.split('\n').forEach(function(line) {
-		var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
-		if(columns) {
-			ret.lines.added += columns[0];
-			ret.lines.deleted += columns[1];
-		}
-	});
+	var currentCommit;
+	if(options.lastBranch) {
+		var currentBranch, checkoutBranch = options.branch;
+		if(!checkoutBranch) { // No branch selected, use latest
+			var latestTimestamp = 0;
 	
-	var commitCount = parseInt(execSync(options.cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
-	if(!isNaN(commitCount)) {
-		ret.commitCount = commitCount;
-	}
-	
-	var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%an <%ae>" --numstat').toString().trim().split('\n');
-	var len = commitsOutput.length,
-		currentCommit;
-	for(var i = 0; i < len; i++) {		
-		var line = commitsOutput[i];
+			var localBranches = [ ];
+			execSync(options.cmd + ' branch --list --no-color').toString().trim().split('\n').forEach(function(branchName) {
+				branchName = branchName.trim();
+				if(branchName[0] === '*') {
+					branchName = branchName.slice(1).trim();
+					currentBranch = branchName;
+				}
+				localBranches.push(branchName);
+			});
 		
-		line = line.trim();
-		if(line.length === 0) {
-			currentCommit = null;
-			continue;
-		}
-		
-		if(!currentCommit) {
-			var sepIndex = line.indexOf(':');
-			if(sepIndex !== -1) {
-				var timestamp = parseInt(line.substr(0, sepIndex));
+			var branchesOutput = execSync(options.cmd + ' branch --list -r --no-color');
+			branchesOutput.toString().trim().split('\n').forEach(function(branchName) {
+				branchName = branchName.trim();
 				
-				if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
-					currentCommit = {
-						author: line.substr(sepIndex + 1),
-						timestamp: timestamp,
-						lines: {
-							added: 0,
-							deleted: 0
-						}
-					};
-					ret.commits.push(currentCommit);
+				if(branchName.length === 0) {
+					return;
+				}
+				
+				if(branchName.indexOf(' -> ') === -1) {
+					branchName = branchName.substr(branchName.indexOf('/') + 1);
+					
+					if(localBranches.indexOf(branchName) === -1) { // Checkout branch if it doesn't exist locally
+						execSync(options.cmd + ' checkout -f ' + branchName, {
+							stdio: [ undefined, undefined, undefined ]
+						});
+						currentBranch = branchName;
+					}
+	
+					var timestamp = parseInt(execSync(options.cmd + ' log ' + branchName + ' -1 --pretty=tformat:"%at"'));
+					
+					if(timestamp > latestTimestamp) {
+						checkoutBranch = branchName;
+						latestTimestamp = timestamp;
+					}
+				}
+			}, this);
+		}
+		
+		if(!checkoutBranch) { // No valid branches
+			return;
+		}
+		
+		if(currentBranch !== checkoutBranch) {
+			execSync(options.cmd + ' checkout -f ' + checkoutBranch, {
+				stdio: [ undefined, undefined, undefined ]
+			});
+		}
+		
+		var numStatOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=tformat: --numstat').toString().trim();
+		numStatOutput.split('\n').forEach(function(line) {
+			var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
+			if(columns) {
+				ret.lines.added += columns[0];
+				ret.lines.deleted += columns[1];
+			}
+		});
+		
+		var commitCount = parseInt(execSync(options.cmd + ' rev-list HEAD ' + authorFilter + '--count').toString().trim());
+		if(!isNaN(commitCount)) {
+			ret.commitCount = commitCount;
+		}
+		
+		var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%an <%ae>" --numstat').toString().trim().split('\n');
+		var len = commitsOutput.length;
+		for(var i = 0; i < len; i++) {		
+			var line = commitsOutput[i];
+			
+			line = line.trim();
+			if(line.length === 0) {
+				currentCommit = null;
+				continue;
+			}
+			
+			if(!currentCommit) {
+				var sepIndex = line.indexOf(':');
+				if(sepIndex !== -1) {
+					var timestamp = parseInt(line.substr(0, sepIndex));
+					
+					if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
+						currentCommit = {
+							author: line.substr(sepIndex + 1),
+							timestamp: timestamp,
+							lines: {
+								added: 0,
+								deleted: 0
+							}
+						};
+						ret.commits.push(currentCommit);
+					}
+				}
+			}
+			else {
+				var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
+				if(columns) {
+					currentCommit.lines.added += columns[0];
+					currentCommit.lines.deleted += columns[1];
 				}
 			}
 		}
-		else {
-			var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
-			if(columns) {
-				currentCommit.lines.added += columns[0];
-				currentCommit.lines.deleted += columns[1];
+	}
+	else {
+		var branches = [ ],
+			c,
+			branchList = execSync(options.cmd + ' branch --list -r --no-color').toString().trim().split('\n'),
+			branchLen = branchList.length;
+		for(c = 0; c < branchLen; c++) {
+			var branchName = branchList[c].trim();	
+			if(branchName.length === 0) {
+				return;
+			}
+			
+			if(branchName.indexOf(' -> ') === -1) {
+				branches.push(branchName);
+			}
+		}
+		
+		var hashes = [ ];
+		branchLen = branches.length;
+		for(c = 0; c < branchLen; c++) {
+			var lines = execSync(options.cmd + ' log ' + branches[c] + ' ' + authorFilter + '--pretty=format:"%H:%at:%an <%ae>" --numstat').toString().trim().split('\n'),
+				lineLen = lines.length;
+			for(var o = 0; o < lineLen; o++) {
+				var currentLine = lines[o].trim();
+				if(currentLine) {
+					if(currentCommit) {
+						var currentColumns = parseNumStatLine(currentLine, filetypeRegex, options.filefilter);
+						if(currentColumns) {
+							currentCommit.lines.added += currentColumns[0];
+							currentCommit.lines.deleted += currentColumns[1];
+						}
+					}
+					else {
+						var pos = currentLine.indexOf(':');
+						if(pos === -1) {
+							continue;
+						}
+						var currentHash = currentLine.slice(0, pos);
+						
+						if(hashes.indexOf(currentHash) !== -1) {
+							continue;
+						}
+						
+						hashes.push(currentHash);
+						
+						var lastPos = pos + 1;
+						pos = currentLine.indexOf(':', lastPos);
+						
+						if(pos === -1) {
+							continue;
+						}
+
+						ret.commitCount++;
+						currentCommit = {
+							author: currentLine.slice(pos + 1),
+							timestamp: currentLine.slice(lastPos, pos),
+							lines: {
+								added: 0,
+								deleted: 0
+							}
+						};
+						if(options.filterTimestamp == null || currentCommit.timestamp >= options.filterTimestamp) {
+							ret.commits.push(currentCommit);
+						}
+					}
+				}
+
+				if((!currentLine || o + 1 >= lineLen) && currentCommit) {
+					ret.lines.added += currentCommit.lines.added;
+					ret.lines.deleted += currentCommit.lines.deleted;
+					currentCommit = null;
+				}
 			}
 		}
 	}
@@ -199,7 +275,8 @@ module.exports = function(config, args, pulledrepos) {
 						filefilter: config.git.filter[file],
 						filterTimestamp: Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)),
 						branch: config.git.branch[file],
-						pull: (!args['disable-pull'] || forcePull) && pulledrepos.indexOf(filepath) === -1
+						pull: (!args['disable-pull'] || forcePull) && pulledrepos.indexOf(filepath) === -1,
+						lastBranch: args['last-branch']
 					});
 					
 					if(inspectData) {
