@@ -44,8 +44,10 @@ module.exports = function(data, args) {
 		
 		for(var o = current.commits.length - 1; o >= 0; o--) {
 			var currentCommit = current.commits[o];
-			currentCommit.name = data[i].name;
-			feedObjects.push(currentCommit);
+			if(currentCommit.lines.added || currentCommit.lines.deleted) {
+				currentCommit.name = data[i].name;
+				feedObjects.push(currentCommit);
+			}
 		}
 	}
 	
@@ -62,25 +64,25 @@ module.exports = function(data, args) {
 
 	var previousEntry;
 	for(i = feedObjects.length - 1; i >= 0 ; i--) {
-		var current = feedObjects[i];
-		if(!previousEntry || previousEntry.name !== current.name
-			|| previousEntry.author !== current.author) {
+		var currentObject = feedObjects[i];
+		if(!previousEntry || previousEntry.name !== currentObject.name
+			|| previousEntry.author !== currentObject.author) {
 			previousEntry = {
-				name: current.name,
-				author: current.author,
-				timestamp: current.timestamp, // Because of how this bit is structured, this will be the latest commited date
+				name: currentObject.name,
+				author: currentObject.author,
+				timestamp: currentObject.timestamp, // Because of how this bit is structured, this will be the latest commited date
 				count: 1,
 				lines: {
-					added: current.lines.added,
-					deleted: current.lines.deleted
+					added: currentObject.lines.added,
+					deleted: currentObject.lines.deleted
 				}
 			};
 			jsonFeed.feed.push(previousEntry);
 		}
 		else {
 			previousEntry.count++;
-			previousEntry.lines.added += current.lines.added;
-			previousEntry.lines.deleted += current.lines.deleted;
+			previousEntry.lines.added += currentObject.lines.added;
+			previousEntry.lines.deleted += currentObject.lines.deleted;
 		}
 	}
 	

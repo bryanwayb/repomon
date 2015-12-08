@@ -198,16 +198,16 @@ function inspectRepo(options) {
 					if(currentCommit) {
 						var currentColumns = parseNumStatLine(currentLine, filetypeRegex, options.filefilter);
 						if(currentColumns) {
-							var filetype = path.extname(currentColumns[2]);
-							var filetypeCount = ret.lines.filetypes[filetype];
-							if(!filetypeCount) {
-								filetypeCount = ret.lines.filetypes[filetype] = {
+							var filetypeExtension = path.extname(currentColumns[2]);
+							var filetypeExtensionCount = ret.lines.filetypes[filetypeExtension];
+							if(!filetypeExtensionCount) {
+								filetypeExtensionCount = ret.lines.filetypes[filetypeExtension] = {
 									added: 0,
 									deleted: 0
 								};
 							}
-							filetypeCount.added += currentColumns[0];
-							filetypeCount.deleted += currentColumns[1];
+							filetypeExtensionCount.added += currentColumns[0];
+							filetypeExtensionCount.deleted += currentColumns[1];
 							currentCommit.lines.added += currentColumns[0];
 							currentCommit.lines.deleted += currentColumns[1];
 						}
