@@ -7,8 +7,8 @@ var defaultFileTypes = [ 'js', 'cs', 'cshtml', 'cc', 'c', 'cpp', 'cxx', 'java', 
 
 function parseNumStatLine(line, filetypeRegex, filefilter) {
 	var columns = line.split('\t');
-		
-	if(columns && columns.length >= 3 && (columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-' && columns[2] != null && columns[2].match(filetypeRegex) && columns[2].match(filefilter)) {
+
+	if(columns && columns.length >= 3 && ((columns[0] || '').trim() !== '-' || (columns[1] || '').trim() !== '-') && columns[2] != null && filetypeRegex.test(columns[2]) && filefilter.test(columns[2])) {
 		columns[0] = parseInt(columns[0]);
 		columns[1] = parseInt(columns[1]);
 		return columns;
@@ -37,13 +37,16 @@ function inspectRepo(options) {
 	var ret = {
 		lines: {
 			added: 0,
-			deleted: 0
+			deleted: 0,
+			filetypes: {
+				
+			}
 		},
 		commitCount: 0,
 		commits: [ ]
 	};
 	
-	var filetypeRegex = new RegExp('\.(' + options.filetypes.join('|') + ')$', 'i');
+	var filetypeRegex = new RegExp('\\.(' + options.filetypes.join('|') + ')$', 'i');
 	
 	process.chdir(options.gitDir); // Sucks to have to do this... NodeJS has buggy execSync functions when it comes to settings a child processes working directory
 	
@@ -127,6 +130,16 @@ function inspectRepo(options) {
 				if(currentCommit) {
 					var columns = parseNumStatLine(line, filetypeRegex, options.filefilter);
 					if(columns) {
+						var filetype = path.extname(columns[2]);
+						var filetypeCount = ret.lines.filetypes[filetype];
+						if(!filetypeCount) {
+							filetypeCount = ret.lines.filetypes[filetype] = {
+								added: 0,
+								deleted: 0
+							};
+						}
+						filetypeCount.added += columns[0];
+						filetypeCount.deleted += columns[1];
 						currentCommit.lines.added += columns[0];
 						currentCommit.lines.deleted += columns[1];
 					}
@@ -185,6 +198,16 @@ function inspectRepo(options) {
 					if(currentCommit) {
 						var currentColumns = parseNumStatLine(currentLine, filetypeRegex, options.filefilter);
 						if(currentColumns) {
+							var filetype = path.extname(currentColumns[2]);
+							var filetypeCount = ret.lines.filetypes[filetype];
+							if(!filetypeCount) {
+								filetypeCount = ret.lines.filetypes[filetype] = {
+									added: 0,
+									deleted: 0
+								};
+							}
+							filetypeCount.added += currentColumns[0];
+							filetypeCount.deleted += currentColumns[1];
 							currentCommit.lines.added += currentColumns[0];
 							currentCommit.lines.deleted += currentColumns[1];
 						}

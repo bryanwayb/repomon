@@ -4,8 +4,13 @@ var fs = require('fs'),
 module.exports = function(data, args) {
 	var jsonFeed = {
 		lines: {
-			added: 0,
-			deleted: 0
+			total: {
+				added: 0,
+				deleted: 0
+			},
+			filetypes: {
+				
+			}
 		},
 		commits: 0,
 		feed: [ ]
@@ -17,8 +22,25 @@ module.exports = function(data, args) {
 	for(i = data.length - 1; i >= 0; i--) {
 		var current = data[i];
 		
-		jsonFeed.lines.added += current.lines.added;
-		jsonFeed.lines.deleted += current.lines.deleted;
+		jsonFeed.lines.total.added += current.lines.added;
+		jsonFeed.lines.total.deleted += current.lines.deleted;
+		
+		for(var filetypeEntry in current.lines.filetypes) {
+			var currentFiletypeCount = jsonFeed.lines.filetypes[filetypeEntry.toLowerCase()],
+				currentDataFiletypeCount = current.lines.filetypes[filetypeEntry];
+			if(!currentFiletypeCount) {
+				console.log(filetypeEntry);
+				currentFiletypeCount = jsonFeed.lines.filetypes[filetypeEntry.toLowerCase()] = {
+					added: currentDataFiletypeCount.added,
+					deleted: currentDataFiletypeCount.deleted
+				};
+			}
+			else {
+				currentFiletypeCount.added += currentDataFiletypeCount.added;
+				currentFiletypeCount.deleted += currentDataFiletypeCount.deleted;
+			}
+		}
+		
 		jsonFeed.commits += current.commitCount;
 		
 		for(var o = current.commits.length - 1; o >= 0; o--) {
