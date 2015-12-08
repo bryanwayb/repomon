@@ -29,7 +29,6 @@ module.exports = function(data, args) {
 			var currentFiletypeCount = jsonFeed.lines.filetypes[filetypeEntry.toLowerCase()],
 				currentDataFiletypeCount = current.lines.filetypes[filetypeEntry];
 			if(!currentFiletypeCount) {
-				console.log(filetypeEntry);
 				currentFiletypeCount = jsonFeed.lines.filetypes[filetypeEntry.toLowerCase()] = {
 					added: currentDataFiletypeCount.added,
 					deleted: currentDataFiletypeCount.deleted
