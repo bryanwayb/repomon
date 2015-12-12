@@ -52,7 +52,7 @@ function inspectRepo(options) {
 	
 	if(options.pull) {
 		try {
-			execSync(options.cmd + ' pull --all', {
+			execSync(options.cmd + ' fetch --all', {
 				stdio: [ undefined, undefined, undefined ]
 			});
 		}

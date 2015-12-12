@@ -164,7 +164,7 @@ function cloneUrlCallback(name, clone) {
 			try {
 				process.chdir(destPath);
 				
-				execSync(config.git.cmd + ' pull --all', {
+				execSync(config.git.cmd + ' fetch --all', {
 					stdio: [ undefined, undefined, undefined ]
 				});
 				
