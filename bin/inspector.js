@@ -42,6 +42,12 @@ function inspectRepo(options) {
 				
 			}
 		},
+		files: {
+			total: 0,
+			filetypes: {
+
+			}
+		},
 		commitCount: 0,
 		commits: [ ]
 	};
@@ -122,7 +128,7 @@ function inspectRepo(options) {
 			});
 		}
 		
-		var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%an <%ae>" --numstat').toString().trim().split('\n');
+		var commitsOutput = execSync(options.cmd + ' log ' + authorFilter + '--pretty=format:"%at:%ae" --numstat').toString().trim().split('\n');
 		var len = commitsOutput.length;
 		for(var i = 0; i < len; i++) {		
 			var line = commitsOutput[i].trim();
@@ -138,10 +144,24 @@ function inspectRepo(options) {
 								deleted: 0
 							};
 						}
+						var currentCommitFiletypeCount = currentCommit.lines.filetypes[filetype];
+						if(!currentCommitFiletypeCount) {
+							currentCommitFiletypeCount = currentCommit.lines.filetypes[filetype] = {
+								added: 0,
+								deleted: 0
+							};
+						}
+						ret.files.total++;
+						if(!ret.files.filetypes[filetype]) {
+							ret.files.filetypes[filetype] = 0;
+						}
+						ret.files.filetypes[filetype]++;
 						filetypeCount.added += columns[0];
 						filetypeCount.deleted += columns[1];
-						currentCommit.lines.added += columns[0];
-						currentCommit.lines.deleted += columns[1];
+						currentCommitFiletypeCount.added += columns[0];
+						currentCommitFiletypeCount.deleted += columns[1];
+						currentCommit.lines.total.added += columns[0];
+						currentCommit.lines.total.deleted += columns[1];
 					}
 				}
 				else {
@@ -153,13 +173,14 @@ function inspectRepo(options) {
 							author: line.substr(sepIndex + 1),
 							timestamp: timestamp,
 							lines: {
-								added: 0,
-								deleted: 0
+								total: {
+									added: 0,
+									deleted: 0
+								},
+								filetypes: { }
 							}
 						};
-						if(options.filterTimestamp == null || timestamp >= options.filterTimestamp) {
-							ret.commits.push(currentCommit);
-						}
+						ret.commits.push(currentCommit);
 					}
 				}
 			}
@@ -190,7 +211,7 @@ function inspectRepo(options) {
 		var hashes = [ ];
 		branchLen = branches.length;
 		for(c = 0; c < branchLen; c++) {
-			var lines = execSync(options.cmd + ' log ' + branches[c] + ' ' + authorFilter + '--pretty=format:"%H:%at:%an <%ae>" --numstat').toString().trim().split('\n'),
+			var lines = execSync(options.cmd + ' log ' + branches[c] + ' ' + authorFilter + '--pretty=format:"%H:%at:%ae" --numstat').toString().trim().split('\n'),
 				lineLen = lines.length;
 			for(var o = 0; o < lineLen; o++) {
 				var currentLine = lines[o].trim();
@@ -206,10 +227,24 @@ function inspectRepo(options) {
 									deleted: 0
 								};
 							}
+							var currentCommitFiletypeExtensionCount = currentCommit.lines.filetypes[filetypeExtension];
+							if(!currentCommitFiletypeExtensionCount) {
+								currentCommitFiletypeExtensionCount = currentCommit.lines.filetypes[filetypeExtension] = {
+									added: 0,
+									deleted: 0
+								};
+							}
+							ret.files.total++;
+							if(!ret.files.filetypes[filetypeExtension]) {
+								ret.files.filetypes[filetypeExtension] = 0;
+							}
+							ret.files.filetypes[filetypeExtension]++;
 							filetypeExtensionCount.added += currentColumns[0];
 							filetypeExtensionCount.deleted += currentColumns[1];
-							currentCommit.lines.added += currentColumns[0];
-							currentCommit.lines.deleted += currentColumns[1];
+							currentCommitFiletypeExtensionCount.added += currentColumns[0];
+							currentCommitFiletypeExtensionCount.deleted += currentColumns[1];
+							currentCommit.lines.total.added += currentColumns[0];
+							currentCommit.lines.total.deleted += currentColumns[1];
 						}
 					}
 					else {
@@ -232,24 +267,27 @@ function inspectRepo(options) {
 							continue;
 						}
 
+						var timestamp = parseInt(currentLine.slice(lastPos, pos));
+
 						ret.commitCount++;
 						currentCommit = {
 							author: currentLine.slice(pos + 1),
-							timestamp: currentLine.slice(lastPos, pos),
+							timestamp: timestamp,
 							lines: {
-								added: 0,
-								deleted: 0
+								total: {
+									added: 0,
+									deleted: 0
+								},
+								filetypes: { }
 							}
 						};
-						if(options.filterTimestamp == null || currentCommit.timestamp >= options.filterTimestamp) {
-							ret.commits.push(currentCommit);
-						}
+						ret.commits.push(currentCommit);
 					}
 				}
 
 				if((!currentLine || o + 1 >= lineLen) && currentCommit) {
-					ret.lines.added += currentCommit.lines.added;
-					ret.lines.deleted += currentCommit.lines.deleted;
+					ret.lines.added += currentCommit.lines.total.added;
+					ret.lines.deleted += currentCommit.lines.total.deleted;
 					currentCommit = null;
 				}
 			}
@@ -283,7 +321,6 @@ module.exports = function(config, args, pulledrepos) {
 						authors: config.git.authors,
 						filetypes: config.git.defaultFiletypes || config.git.filetypes[file],
 						filefilter: config.git.filter[file],
-						filterTimestamp: Math.floor((Date.now() / 1000) - (config.git.lookback || 604800)),
 						branch: config.git.branch[file],
 						pull: (!args['disable-pull'] || forcePull) && pulledrepos.indexOf(filepath) === -1,
 						lastBranch: args['last-branch']

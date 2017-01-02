@@ -212,7 +212,7 @@ function cloneCompletionCallback() {
 		
 		console.log('Generating ' + reporterName + ' report');
 		
-		var output = reporter(data, args),
+		var output = reporter(config, data, args),
 			filename = args.output || args.o;
 		if(filename) {
 			fs.writeFileSync(path.resolve(process.cwd(), filename), output);
