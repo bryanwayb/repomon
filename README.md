@@ -1,0 +1,2 @@
+# repomon
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/7f5db0a30c204889aac70c7dbb064e18)](https://www.codacy.com/app/bryanwayb/repomon?utm_source=github.com&utm_medium=referral&utm_content=bryanwayb/repomon&utm_campaign=badger)
